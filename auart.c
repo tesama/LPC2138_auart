@@ -38,6 +38,9 @@
 //---------------------------------------------------------------------
 
 RingBuffer_t gReceiverBuffer;
+RingBuffer_t gTransmitterBuffer;
+
+static bool gUseTransmitHoldingRegisterEmptyEventForSending = false;
 
 //---------------------------------------------------------------------
 //	FILE SCOPE FUNCTIONS
@@ -49,44 +52,65 @@ RingBuffer_t gReceiverBuffer;
 
 void isr_uart0( void ) __irq
 {
+	unsigned char nextData;
+	uint32_t u0iir;
+	
 	//
 	// try handle all pending interrupt
 	//
-	while ((U0IIR & BITMASK_INTERRUPT_PENDING) == 0)
+	u0iir = U0IIR;
+	switch( u0iir & BITMASK_INTERRUPT_IDENTIFICATION )
 	{
-		switch( U0IIR & BITMASK_INTERRUPT_IDENTIFICATION )
+		case EVENT_RECEIVE_LINE_STATUS:
 		{
-			case EVENT_RECEIVE_LINE_STATUS:
-			{
-				//
-				// *** Please code the handling ***
-				//
+			//
+			// *** Please code the handling ***
+			//
 
-				// read LSR to clear interrupt
-				U0LSR & 0xFF;
+			// read LSR to clear interrupt
+			U0LSR & 0xFF;
+			break;
+		}
+		
+		case EVENT_RECEIVE_DATA_AVAILABLE:
+		case EVENT_CHARACTER_TIME_OUT_INDICATOR:
+		{														 
+			RingBuffer_push(&gReceiverBuffer, U0RBR);
+			break;
+		}
+		
+		case EVENT_TRANSMIT_HOLDING_REGISTER_EMPTY:
+		{
+			//
+			// If the mean of sending data is 'printf', 
+			//	Then no need to use this event.
+			//
+			if (!gUseTransmitHoldingRegisterEmptyEventForSending)
 				break;
-			}
 			
-			case EVENT_RECEIVE_DATA_AVAILABLE:
-			case EVENT_CHARACTER_TIME_OUT_INDICATOR:
-			{														 
-				RingBuffer_push(&gReceiverBuffer, U0RBR);
-				break;
-			}
-			
-			case EVENT_TRANSMIT_HOLDING_REGISTER_EMPTY:
+			//
+			// check the data waiting in the transmitter buffer, 
+			//	pop one of them and send it out.
+			//
+			if (RingBuffer_pop(&gTransmitterBuffer, &nextData) == RingBuffer_FAIL)
 			{
 				//
-				// *** Please code the handling ***
+				// If there is no data left, set 
+				//	gUseTransmitHoldingRegisterEmptyEventForSending to false
 				//
-				
+				gUseTransmitHoldingRegisterEmptyEventForSending = false;
 				break;
 			}
 			
-			default:
-				// unkown event, so do nothing
-				break;
+			// send the next one
+			U0THR = nextData;
+			
+			break;
 		}
+		
+		default:
+			// unkown event, so do nothing
+			break;
 	}
 
 	// dummy write to signal end of interrupt
@@ -156,6 +180,7 @@ int32_t AUART_init(uint32_t pclk, uint32_t baudRate_bps, uint8_t interruptLevel)
 	
 	// clear receiver buffer
 	RingBuffer_clearBuffer(&gReceiverBuffer);
+	RingBuffer_clearBuffer(&gTransmitterBuffer);
 	
 	return 0;
 }
@@ -215,14 +240,34 @@ void AUART_write(uint8_t data)
 
 // ------------------------------------------
 // write bytes to the serial port;
-void AUART_write_bytes(uint8_t numBytes, uint8_t* pData)
+void AUART_write_bytes(uint8_t numBytes, uint8_t* pData, bool noWait)
 {
-	while(numBytes > 0)
+	unsigned char dataToSend;
+	
+	//
+	// send the data one by one and block other process
+	//	until all data has bee transmitted out.
+	//
+	if (!noWait)
 	{
-		sendchar(*pData);
-		pData++;
-		numBytes--;
+		while(numBytes > 0)
+		{
+			sendchar(*pData);
+			pData++;
+			numBytes--;
+		}
+		
+		return;
 	}
+	
+	//
+	// push data to the transmit buffer
+	//	and start the transmition immediately if the transimitter is free
+	//
+	RingBuffer_pushArray(&gTransmitterBuffer, pData, numBytes);
+	RingBuffer_pop(&gTransmitterBuffer, &dataToSend);
+	gUseTransmitHoldingRegisterEmptyEventForSending = true;
+	sendchar(dataToSend);
 }
 
 

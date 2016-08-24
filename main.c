@@ -34,7 +34,10 @@
 
 char gRawMessage[66];
 char gMessage[33];
+char gPrintfStr[64];
 uint8_t buffer[33];
+
+uint16_t gCounts=0;
 
 
 //---------------------------------------------------------------------
@@ -62,6 +65,119 @@ void init()
 	AUART_init(PCLK, 115200, INTERRUPT_PRIORITY_UART0);
 }
 
+// ---------------------------------------
+void test_01()
+{
+	int32_t numReadBytes;
+	char* carriageReturnPtr;
+	uint32_t numCopyingBytes;
+	
+	//
+	// Check the data from serial port
+	//
+	numReadBytes = AUART_read_bytes(AUART_get_recv_available(), buffer);
+	if (numReadBytes > 0)
+	{
+		buffer[numReadBytes] = 0;
+		strcat(gRawMessage, (char*)buffer);
+	}
+	
+	//
+	// Check end of message character (in this case it is CR)
+	//	Then send out all completed messages.
+	//
+	while(true)
+	{
+		carriageReturnPtr = strchr(gRawMessage, '\r');
+		if (carriageReturnPtr == NULL)
+			// no any CR in the raw message.
+			// so keep the them for next time processing
+			break;
+		
+		// split the message out and send it to the serial port
+		numCopyingBytes = (uint32_t)(carriageReturnPtr-gRawMessage);
+		strncpy(gMessage, gRawMessage, numCopyingBytes);
+		gMessage[numCopyingBytes] = 0;
+		printf("we got: %s\r\n", gMessage);
+		
+		// eliminate the data which was splitted out from the raw message
+		strcpy(gRawMessage, &gRawMessage[numCopyingBytes+1]);
+	}
+	
+	//
+	// do LED blinking
+	//
+	if (IOPIN1 == 0xFFFF0000)
+		IOCLR1 	= 0xFFFF0000;
+	else
+		IOSET1 	= 0xFFFF0000;
+	
+	delay_ms(1000);
+}
+
+
+// ---------------------------------------
+void test_02()
+{
+	sprintf(gPrintfStr, "gCounts = %d\r\n", gCounts);
+	AUART_write_bytes(strlen(gPrintfStr), (uint8_t*)gPrintfStr, true);
+	gCounts++;
+	delay_ms(1000);
+}
+
+
+// ---------------------------------------
+void test_03()
+{
+		int32_t numReadBytes;
+	char* carriageReturnPtr;
+	uint32_t numCopyingBytes;
+	
+	//
+	// Check the data from serial port
+	//
+	numReadBytes = AUART_read_bytes(AUART_get_recv_available(), buffer);
+	if (numReadBytes > 0)
+	{
+		buffer[numReadBytes] = 0;
+		strcat(gRawMessage, (char*)buffer);
+	}
+	
+	//
+	// Check end of message character (in this case it is CR)
+	//	Then send out all completed messages.
+	//
+	while(true)
+	{
+		carriageReturnPtr = strchr(gRawMessage, '\r');
+		if (carriageReturnPtr == NULL)
+			// no any CR in the raw message.
+			// so keep the them for next time processing
+			break;
+		
+		// split the message out and send it to the serial port
+		numCopyingBytes = (uint32_t)(carriageReturnPtr-gRawMessage);
+		strncpy(gMessage, gRawMessage, numCopyingBytes);
+		gMessage[numCopyingBytes] = 0;
+		sprintf(gPrintfStr, "we got: %s\r\n", gMessage);
+		AUART_write_bytes(strlen(gPrintfStr), (uint8_t*)gPrintfStr, true);
+		
+		// eliminate the data which was splitted out from the raw message
+		strcpy(gRawMessage, &gRawMessage[numCopyingBytes+1]);
+	}
+	
+	//
+	// do LED blinking
+	//
+	if (IOPIN1 == 0xFFFF0000)
+		IOCLR1 	= 0xFFFF0000;
+	else
+		IOSET1 	= 0xFFFF0000;
+	
+	delay_ms(1000);
+}
+
+
 
 //---------------------------------------------------------------------
 //	MAIN FUNCTION
@@ -69,10 +185,6 @@ void init()
 
 int32_t main(void)
 {
-	int32_t numReadBytes;
-	char* carriageReturnPtr;
-	uint32_t numCopyingBytes;
-	
 	// initialize GPIO and UART0
 	init();
 	
@@ -84,48 +196,9 @@ int32_t main(void)
 	printf("Hello, Saranchana ^w^/\r\n");
 	while(true)
 	{
-		//
-		// Check the data from serial port
-		//
-		numReadBytes = AUART_read_bytes(AUART_get_recv_available(), buffer);
-		if (numReadBytes > 0)
-		{
-			buffer[numReadBytes] = 0;
-			strcat(gRawMessage, (char*)buffer);
-		}
-		
-		//
-		// Check end of message character (in this case it is CR)
-		//	Then send out all completed messages.
-		//
-		while(true)
-		{
-			carriageReturnPtr = strchr(gRawMessage, '\r');
-			if (carriageReturnPtr == NULL)
-				// no any CR in the raw message.
-				// so keep the them for next time processing
-				break;
-			
-			// split the message out and send it to the serial port
-			numCopyingBytes = (uint32_t)(carriageReturnPtr-gRawMessage);
-			strncpy(gMessage, gRawMessage, numCopyingBytes);
-			gMessage[numCopyingBytes] = 0;
-			printf("we got: %s\r\n", gMessage);
-			
-			// eliminate the data which was splitted out from the raw message
-			strcpy(gRawMessage, &gRawMessage[numCopyingBytes+1]);
-		}
-		
-		//
-		// do LED blinking
-		//
-		if (IOPIN1 == 0xFFFF0000)
-			IOCLR1 	= 0xFFFF0000;
-		else
-			IOSET1 	= 0xFFFF0000;
-		
-		delay_ms(1000);
-		
+		//test_01();
+		//test_02();
+		test_03();
 	}
 	
 	return 0;

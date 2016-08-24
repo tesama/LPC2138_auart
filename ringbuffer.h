@@ -31,7 +31,7 @@
 //
 // Change the following line to adjust the buffer size
 //
-#define RingBuffer_BUFF_SIZE	(uint8_t)32
+#define RingBuffer_BUFF_SIZE	(uint8_t)64
 
 typedef struct
 {

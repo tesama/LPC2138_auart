@@ -24,6 +24,7 @@
 
 #include <LPC213x.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 //---------------------------------------------------------------------
 //
@@ -66,7 +67,7 @@ int32_t AUART_read_bytes(uint8_t numBytes, uint8_t* pData_ret);
 void AUART_write(uint8_t data);
 
 // write bytes to the serial port;
-void AUART_write_bytes(uint8_t numBytes, uint8_t* pData);
+void AUART_write_bytes(uint8_t numBytes, uint8_t* pData, bool noWait);
 
 
 
